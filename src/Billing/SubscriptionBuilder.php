@@ -83,8 +83,9 @@ final class SubscriptionBuilder
                 throw BillingException::alreadySubscribed($this->type);
             }
 
-            // Changing plan or payer email before finishing the checkout keeps the trial days left.
-            $carriedTrialEndsAt = $current->onTrial() ? $current->trial_ends_at : null;
+            // Changing plan or payer email before finishing the checkout keeps the trial days left, even when
+            // billing.trial_statuses leaves out "pending" (that setting is about access, not about the days owed).
+            $carriedTrialEndsAt = $current->trial_ends_at?->isFuture() === true ? $current->trial_ends_at : null;
 
             $current->cancel();
         }

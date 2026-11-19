@@ -97,6 +97,8 @@ final class CheckoutTest extends TestCase
 
     public function test_changing_payer_email_before_paying_replaces_the_checkout_and_keeps_the_trial(): void
     {
+        // The days left carry over even when an unfinished checkout doesn't grant access.
+        config()->set('mercadopago.billing.trial_statuses', ['authorized']);
         $mercadoPago = MercadoPago::fake();
         $team = Team::create(['name' => 'Acme', 'email' => 'billing@acme.test']);
 
