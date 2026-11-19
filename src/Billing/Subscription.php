@@ -21,6 +21,7 @@ use MatiasYocca\MercadoPago\Exceptions\BillingException;
  * @property string $preapproval_id
  * @property string|null $status
  * @property string|null $init_point
+ * @property string|null $payer_email
  * @property string|null $amount
  * @property string|null $currency
  * @property CarbonImmutable|null $trial_ends_at

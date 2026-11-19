@@ -51,6 +51,7 @@ final class CheckoutTest extends TestCase
         $subscription = $checkout->subscription;
 
         $this->assertSame($checkout->url, $subscription->init_point);
+        $this->assertSame('billing@acme.test', $subscription->payer_email);
         $this->assertSame('pro', $subscription->plan);
         $this->assertSame('default', $subscription->type);
         $this->assertSame('pending', $subscription->status);
@@ -92,6 +93,30 @@ final class CheckoutTest extends TestCase
         $this->assertTrue($second->subscription->trial_ends_at->equalTo($first->subscription->trial_ends_at));
         $this->assertSame('business', $team->subscription()->plan);
         Event::assertDispatched(SubscriptionCancelled::class);
+    }
+
+    public function test_changing_payer_email_before_paying_replaces_the_checkout_and_keeps_the_trial(): void
+    {
+        $mercadoPago = MercadoPago::fake();
+        $team = Team::create(['name' => 'Acme', 'email' => 'billing@acme.test']);
+
+        $first = $team->newSubscription('default', 'pro')->payerEmail('typo@acme.test')->checkout();
+        CarbonImmutable::setTestNow(CarbonImmutable::now()->addDays(4));
+        $second = $team->newSubscription('default', 'pro')->payerEmail('owner@acme.test')->checkout();
+
+        $this->assertNotSame($first->url, $second->url);
+        $this->assertSame('cancelled', $first->subscription->refresh()->status);
+        $mercadoPago->assertSubscriptionCreatedTimes(2);
+        $mercadoPago->assertSubscriptionCreated(fn (array $payload): bool => $payload['payer_email'] === 'owner@acme.test'
+            && $payload['auto_recurring']['free_trial'] === ['frequency' => 10, 'frequency_type' => 'days']);
+        $this->assertSame('owner@acme.test', $team->subscription()->payer_email);
+        $this->assertTrue($second->subscription->trial_ends_at->equalTo($first->subscription->trial_ends_at));
+
+        // The same email again finds the new checkout.
+        $third = $team->newSubscription('default', 'pro')->payerEmail('owner@acme.test')->checkout();
+
+        $this->assertSame($second->url, $third->url);
+        $mercadoPago->assertSubscriptionCreatedTimes(2);
     }
 
     public function test_it_refuses_a_second_checkout_when_already_authorized(): void

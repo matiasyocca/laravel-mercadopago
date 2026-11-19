@@ -38,6 +38,8 @@ MERCADOPAGO_WEBHOOK_SECRET=...
 
 If your tenant keys are UUIDs or ULIDs, call `Schema::morphUsingUuids()` (or `morphUsingUlids()`) before running the migration, or edit the published migration.
 
+When upgrading, copy only the package migrations you don't have yet from `database/migrations` into your app. Publishing again would also copy the ones you already ran, under new dates.
+
 ## Plans
 
 Plans live in `config/mercadopago.php`, not in Mercado Pago. Each checkout creates a Mercado Pago subscription *without* an associated plan, using these values, so there are no plan IDs to keep in sync between sandbox and production.
@@ -160,6 +162,7 @@ When a subscription is cancelled, `ends_at` becomes the later of the trial end a
 ### Things to know
 
 - **One free trial per billable.** A billable that ever had a trial won't get another one. Changing plan before finishing the checkout keeps the days left.
+- **The payer email must be the payer's Mercado Pago email.** Mercado Pago rejects the payment when someone else authorizes the checkout. A pending checkout is reused only for the same plan and payer email: passing another email (for example, to fix a typo) replaces it and keeps the trial days left.
 - **The trial is tracked locally.** Mercado Pago starts its own free trial when the payer authorizes the subscription. A payer who authorizes late in the local trial still gets the full free period on Mercado Pago's side.
 - **No proration.** `swap()` changes the amount from the next charge on. Mercado Pago can't change a subscription's frequency, so swapping between cycles (monthly to yearly) throws: cancel and start a new checkout instead.
 - **One subscription per type.** Use different types (`newSubscription('addons', ...)`) for independent subscriptions.

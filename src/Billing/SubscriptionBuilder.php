@@ -56,8 +56,10 @@ final class SubscriptionBuilder
     }
 
     /**
-     * Reuses a pending checkout for the same plan, replaces a pending or
-     * paused one for another plan, and refuses when already authorized.
+     * Reuses a pending checkout for the same plan and payer email, replaces
+     * a pending one for another plan or email (Mercado Pago only lets the
+     * email it was created for pay it) or a paused one, and refuses when
+     * already authorized.
      */
     public function checkout(): Checkout
     {
@@ -69,10 +71,11 @@ final class SubscriptionBuilder
     private function createCheckout(): Checkout
     {
         $current = $this->billable->subscription($this->type);
+        $payerEmail = $this->payerEmail ?? $this->billable->mercadoPagoPayerEmail();
         $carriedTrialEndsAt = null;
 
         if ($current !== null && ! $current->cancelled()) {
-            if ($current->pending() && $current->plan === $this->plan->key && filled($current->init_point)) {
+            if ($current->pending() && $current->plan === $this->plan->key && $current->payer_email === $payerEmail && filled($current->init_point)) {
                 return new Checkout($current, (string) $current->init_point);
             }
 
@@ -80,14 +83,13 @@ final class SubscriptionBuilder
                 throw BillingException::alreadySubscribed($this->type);
             }
 
-            // Changing plan before finishing the checkout keeps the trial days left.
+            // Changing plan or payer email before finishing the checkout keeps the trial days left.
             $carriedTrialEndsAt = $current->onTrial() ? $current->trial_ends_at : null;
 
             $current->cancel();
         }
 
-        $payerEmail = $this->payerEmail ?? $this->billable->mercadoPagoPayerEmail()
-            ?? throw BillingException::missingPayerEmail();
+        $payerEmail ??= throw BillingException::missingPayerEmail();
 
         $withTrial = $this->withTrial && $this->plan->hasTrial() && ! $this->hadTrial();
         $autoRecurring = $this->plan->autoRecurring($withTrial);
@@ -118,6 +120,7 @@ final class SubscriptionBuilder
             'type' => $this->type,
             'plan' => $this->plan->key,
             'preapproval_id' => $preApproval->id,
+            'payer_email' => $payerEmail,
             'trial_ends_at' => $trialEndsAt,
         ]);
 
